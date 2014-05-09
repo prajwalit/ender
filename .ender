@@ -1,0 +1,26 @@
+[
+  {
+    "project": "foo",
+    "default": true,
+    "root": "/Users/prajwalit/repos/foo",
+    "run": [
+      "h-split",
+      "select-pane 0",
+      "cd $root",
+      "select-pane 1"
+      "cd $root"
+    ]
+  },
+  {
+    "project": "bar",
+    "root": "/Users/prajwalit/repos/bar",
+    "run": [
+      "h-split",
+      "select-pane 0",
+      "cd $root",
+      "type git pull origin $branch",
+      "select-pane 1",
+      "cd $root"
+    ]
+  }
+]

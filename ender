@@ -1,0 +1,116 @@
+#!/usr/bin/python
+
+from sys import argv
+import os
+import subprocess
+import json
+
+
+def run_tmux(cmd, shell_cmd=False, enter=True):
+    if shell_cmd:
+        key = ""
+        if enter:
+            key = " C-m"
+        subprocess.call("tmux send-keys '%s'%s" % (cmd, key), shell=True)
+    else:
+        return subprocess.check_output("tmux %s" % cmd, shell=True)
+
+
+def parse_dot_ender():
+    config_file = os.path.expanduser("~/.ender")
+    if not os.path.exists(config_file):
+        print "Config file `~/.ender` does not exist."
+        return False
+    else:
+        config_file = open(config_file);
+        return json.loads(config_file.read())
+
+def run(cmds, root):
+    for c in cmds:
+
+        #special keywords
+        if "$root" in c:
+            c = c.replace("$root", root)
+
+        if "$branch" in c:
+            br_cmd = "cd %s;git rev-parse --abbrev-ref HEAD" % root
+            br = subprocess.check_output(br_cmd, shell=True)
+            br = br.split("\n")[0]
+            c = c.replace("$branch", br)
+
+
+        parts = c.split(" ", 1)
+        first = parts[0]
+
+        if (len(parts) > 1):
+            other = " " + parts[1]
+        else:
+            other = ""
+
+        if first == "h-split":
+            run_tmux("split-window -h -c %s %s" % (root, other))
+        elif first == "v-split":
+            run_tmux("split-window -c %s %s" % (root, other))
+        elif first == "select-pane":
+            run_tmux("select-pane -t%s" % other)
+        elif first == "type":
+            run_tmux(parts[1], True, False)
+        else:
+            run_tmux(c, True)
+
+
+def start_proj(proj):
+    name = proj["project"]
+    print "Starting %s" % name
+    op = run_tmux("list-panes")
+    num_panes = len (op.split("\n")) - 1
+    if num_panes == 1:
+        run_tmux("rename-window ender-%s" % name)
+    else:
+        run_tmux("new-window -n ender-%s" % name)
+    run(proj["run"], proj["root"])
+
+
+if __name__ == "__main__":
+    projects = parse_dot_ender()
+    if not projects:
+        print "No projects found"
+
+    arg_len = len(argv)
+
+    if arg_len == 1:
+        default_proj = None
+        for p in projects:
+            if "default" in p:
+                default_proj = p
+                break
+
+        if not default_proj:
+            print "No default project specified"
+        else:
+            start_proj(default_proj)
+
+    elif arg_len == 2:
+        first = argv[1]
+        if first == "end" or first == "stop":
+            run_tmux("kill-pane -a")
+            run_tmux("clear", True)
+        elif first == "-l" or first == "--list":
+            for p in projects:
+                print p["project"]
+        elif first == "-v" or first == "--version":
+            print "2.0"
+        else:
+            open_proj = None;
+            for p in projects:
+                if p["project"] == first:
+                    open_proj = p
+                    break
+            if not open_proj:
+                print "Project %s not found" % first
+            else:
+                start_proj(open_proj)
+
+
+    else:
+        print "Umm... What?"
